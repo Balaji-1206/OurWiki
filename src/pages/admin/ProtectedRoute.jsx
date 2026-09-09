@@ -9,10 +9,10 @@ import LoadingState from '../../components/LoadingState';
  * so bypassing this component client-side would just produce 403s, not data.
  */
 export default function ProtectedRoute({ children }) {
-  const { loading, isAdmin } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (loading) return <LoadingState label="Checking session…" />;
-  if (!isAdmin) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return children;
 }

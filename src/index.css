@@ -2,15 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Minimal highlight.js theme (GitHub-light-ish) so code blocks are readable
-   without pulling in a full highlight.js CSS bundle. */
-.hljs { color: #1a1d1f; background: #f6f7f5; }
+/* Highlight.js theme (light + dark mode) */
+.hljs { color: #1a1d1f; background: transparent; }
 .hljs-comment, .hljs-quote { color: #6b7280; font-style: italic; }
 .hljs-keyword, .hljs-selector-tag, .hljs-literal { color: #245B57; font-weight: 600; }
 .hljs-string, .hljs-doctag { color: #7a4a1e; }
 .hljs-number, .hljs-attr { color: #9d4b16; }
 .hljs-title, .hljs-section, .hljs-name { color: #1f4fa0; font-weight: 600; }
 .hljs-variable, .hljs-template-variable { color: #b3261e; }
+
+/* Dark mode syntax highlighting */
+.dark .hljs { color: #e2e8f0; }
+.dark .hljs-comment, .dark .hljs-quote { color: #94a3b8; }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-literal { color: #34d399; }
+.dark .hljs-string, .dark .hljs-doctag { color: #f59e0b; }
+.dark .hljs-number, .dark .hljs-attr { color: #fb923c; }
+.dark .hljs-title, .dark .hljs-section, .dark .hljs-name { color: #60a5fa; }
+.dark .hljs-variable, .dark .hljs-template-variable { color: #f87171; }
 
 .prose-doc :is(h1, h2, h3, h4) { font-weight: 600; letter-spacing: -0.01em; margin-top: 1.75em; margin-bottom: 0.5em; }
 .prose-doc h1 { font-size: 1.6rem; }
@@ -24,8 +32,71 @@
 .prose-doc a { color: #245B57; text-decoration: underline; text-underline-offset: 2px; }
 .prose-doc blockquote { border-left: 3px solid #E3E5E1; padding-left: 1em; color: #5B6168; margin: 1em 0; }
 .prose-doc code:not(pre code) { background: #EEF1EE; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; }
-.prose-doc pre { background: #f6f7f5; border: 1px solid #E3E5E1; border-radius: 8px; padding: 1em; overflow-x: auto; margin: 1em 0; }
+.prose-doc pre { margin: 0; background: transparent; }
 .prose-doc table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.92em; }
 .prose-doc th, .prose-doc td { border: 1px solid #E3E5E1; padding: 0.5em 0.75em; text-align: left; }
 .prose-doc th { background: #F0F1EE; }
 .prose-doc img { max-width: 100%; }
+
+/* Dark mode prose overrides */
+.dark .prose-doc a { color: #34d399; }
+.dark .prose-doc blockquote { border-left-color: #334155; color: #94a3b8; }
+.dark .prose-doc code:not(pre code) { background: #1e293b; color: #e2e8f0; }
+.dark .prose-doc table, .dark .prose-doc th, .dark .prose-doc td { border-color: #334155; }
+.dark .prose-doc th { background: #1e293b; color: #e2e8f0; }
+
+/* ==========================================================================
+   Modern Sleek Scrollbars & Layout Stability
+   ========================================================================== */
+
+/* Prevent layout jump when scrollbars appear */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Custom sleek scrollbars for Chromium/Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.35);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* Remove native Windows arrow buttons completely */
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Utility to completely hide scrollbars while still allowing smooth scrolling */
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
