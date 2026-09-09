@@ -21,23 +21,51 @@ export function AuthProvider({ children }) {
       setProfile(null);
       return;
     }
+    const defaultProfile = {
+      id: session.user.id,
+      email: session.user.email,
+      display_name:
+        session.user.user_metadata?.display_name ||
+        session.user.user_metadata?.full_name ||
+        session.user.email?.split('@')[0] ||
+        'User',
+      role: 'editor',
+    };
+    // Attempt to enrich with custom profile if exists, else keep default
+    setProfile(defaultProfile);
     supabase
       .from('profiles')
       .select('id, role, display_name')
       .eq('id', session.user.id)
       .maybeSingle()
-      .then(({ data }) => setProfile(data));
+      .then(({ data }) => {
+        if (data) {
+          setProfile((prev) => ({
+            ...prev,
+            display_name: data.display_name || prev.display_name,
+            role: data.role || prev.role,
+          }));
+        }
+      })
+      .catch(() => {
+        // Safe to ignore if profiles table is not used
+      });
   }, [session?.user?.id]);
+
+  const user = session?.user ?? null;
+  const isAuthenticated = !!user;
 
   const value = {
     session,
-    user: session?.user ?? null,
+    user,
     profile,
-    // NOTE: isAdmin only controls which UI is *shown* (nav links, routes).
-    // It grants no actual privilege — every read/write it gates is re-checked
-    // by Postgres RLS via is_admin() regardless of what this flag says.
-    isAdmin: !!profile,
+    isAuthenticated,
+    // Any authenticated Supabase user can edit and access wiki studio
+    canEdit: isAuthenticated,
+    isAdmin: isAuthenticated,
     isOwner: profile?.role === 'owner',
+    userEmail: user?.email ?? '',
+    displayName: profile?.display_name || user?.email?.split('@')[0] || 'User',
     loading: session === undefined,
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     signOut: () => supabase.auth.signOut(),

@@ -1,15 +1,27 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { getNavTree } from '../services/topics';
 
-let cache = null; // module-level cache: one fetch per page session, not per component
+let cache = null;
+
+export function clearNavTreeCache() {
+  cache = null;
+}
 
 export function useNavTree() {
-  const [tree, setTree] = useState(cache);
+  const [tree, setTree] = useState(cache || []);
   const [loading, setLoading] = useState(!cache);
   const [error, setError] = useState(null);
+  const location = useLocation();
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (force = false) => {
+    if (!force && cache && cache.length > 0) {
+      setTree(cache);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const data = await getNavTree();
       cache = data;
@@ -22,9 +34,10 @@ export function useNavTree() {
     }
   }, []);
 
+  // Re-check navigation on route changes so newly created topics appear immediately
   useEffect(() => {
-    if (!cache) refresh();
-  }, [refresh]);
+    refresh(true);
+  }, [refresh, location.pathname]);
 
   return { tree: tree ?? [], loading, error, refresh };
 }

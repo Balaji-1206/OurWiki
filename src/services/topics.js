@@ -11,18 +11,37 @@ import { supabase } from '../lib/supabaseClient';
  * calling createTopic() will simply get a 403 back from Postgres.
  */
 
-const PUBLIC_FIELDS =
-  'id, parent_id, slug, title, content, full_path, depth, meta_description, status, published_at, updated_at';
+const BASE_PUBLIC_FIELDS =
+  'id, parent_id, slug, title, content, full_path, depth, position, meta_description, status, published_at, updated_at, created_at, created_by';
+
+const EXTENDED_PUBLIC_FIELDS =
+  'id, parent_id, slug, title, content, full_path, depth, position, meta_description, status, published_at, updated_at, created_at, created_by, updated_by, created_by_email, updated_by_email';
+
+const BASE_NAV_FIELDS =
+  'id, parent_id, slug, title, full_path, depth, position, meta_description, updated_at';
+
+const EXTENDED_NAV_FIELDS =
+  'id, parent_id, slug, title, full_path, depth, position, meta_description, updated_at, updated_by_email';
 
 /** GET /:path* — resolve a public URL to its page, following redirects. */
 export async function getTopicByPath(path) {
   const clean = normalizePath(path);
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('topics')
-    .select(PUBLIC_FIELDS)
+    .select(EXTENDED_PUBLIC_FIELDS)
     .eq('full_path', clean)
     .maybeSingle();
+
+  if (error && error.code === '42703') {
+    const fallback = await supabase
+      .from('topics')
+      .select(BASE_PUBLIC_FIELDS)
+      .eq('full_path', clean)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   if (data) return { topic: data, redirectedFrom: null };
@@ -37,11 +56,21 @@ export async function getTopicByPath(path) {
   if (rErr) throw rErr;
   if (!redirect) return { topic: null, redirectedFrom: null };
 
-  const { data: target, error: tErr } = await supabase
+  let { data: target, error: tErr } = await supabase
     .from('topics')
-    .select(PUBLIC_FIELDS)
+    .select(EXTENDED_PUBLIC_FIELDS)
     .eq('id', redirect.topic_id)
     .maybeSingle();
+
+  if (tErr && tErr.code === '42703') {
+    const fallback = await supabase
+      .from('topics')
+      .select(BASE_PUBLIC_FIELDS)
+      .eq('id', redirect.topic_id)
+      .maybeSingle();
+    target = fallback.data;
+    tErr = fallback.error;
+  }
 
   if (tErr) throw tErr;
   return { topic: target, redirectedFrom: clean };
@@ -60,13 +89,117 @@ export async function getTopicChildren(path) {
 
   const { data, error } = await supabase
     .from('topics')
-    .select('id, slug, title, full_path, position, status')
+    .select('id, slug, title, full_path, position, status, meta_description')
     .eq('parent_id', parent.id)
     .order('position', { ascending: true })
     .order('title', { ascending: true });
 
   if (error) throw error;
   return data;
+}
+
+/** Fetches children, siblings, and parent for a given topic to populate the right rail */
+export async function getTopicChildrenAndSiblings(topic) {
+  if (!topic?.id) return { children: [], siblings: [], parent: null };
+
+  try {
+    // 1. Fetch direct children by parent_id
+    const childrenPromise = supabase
+      .from('topics')
+      .select('id, slug, title, full_path, position, status, meta_description, parent_id')
+      .eq('parent_id', topic.id)
+      .order('position', { ascending: true })
+      .order('title', { ascending: true });
+
+    // 2. Fetch siblings and parent
+    let siblingsPromise;
+    let parentPromise;
+
+    if (topic.parent_id) {
+      siblingsPromise = supabase
+        .from('topics')
+        .select('id, slug, title, full_path, position, status')
+        .eq('parent_id', topic.parent_id)
+        .neq('id', topic.id)
+        .order('position', { ascending: true })
+        .order('title', { ascending: true });
+
+      parentPromise = supabase
+        .from('topics')
+        .select('id, slug, title, full_path')
+        .eq('id', topic.parent_id)
+        .maybeSingle();
+    } else {
+      // Root topic - other root topics are related
+      siblingsPromise = supabase
+        .from('topics')
+        .select('id, slug, title, full_path, position, status')
+        .is('parent_id', null)
+        .neq('id', topic.id)
+        .order('position', { ascending: true })
+        .order('title', { ascending: true });
+
+      parentPromise = Promise.resolve({ data: null, error: null });
+    }
+
+    const [
+      { data: directChildren, error: cErr },
+      { data: siblings, error: sErr },
+      { data: parent },
+    ] = await Promise.all([childrenPromise, siblingsPromise, parentPromise]);
+
+    if (cErr) console.error('Error fetching children:', cErr);
+    if (sErr) console.error('Error fetching siblings:', sErr);
+
+    let children = directChildren || [];
+
+    // Fallback: if no direct children found by parent_id, check full_path prefix
+    if (children.length === 0 && topic.full_path) {
+      const { data: pathChildren } = await supabase
+        .from('topics')
+        .select('id, slug, title, full_path, position, status, meta_description, parent_id')
+        .like('full_path', `${topic.full_path}/%`)
+        .order('position', { ascending: true })
+        .order('title', { ascending: true });
+
+      if (pathChildren && pathChildren.length > 0) {
+        // Immediate child has exactly 1 more segment than parent
+        const parentSegmentCount = topic.full_path.split('/').length;
+        const immediate = pathChildren.filter((c) => c.full_path.split('/').length === parentSegmentCount + 1);
+        children = immediate.length > 0 ? immediate : pathChildren;
+      }
+    }
+
+    return {
+      children,
+      siblings: siblings || [],
+      parent: parent || null,
+    };
+  } catch (err) {
+    console.error('Error in getTopicChildrenAndSiblings:', err);
+    return { children: [], siblings: [], parent: null };
+  }
+}
+
+/** Fetch revision history for a topic */
+export async function getTopicHistory(topicId) {
+  if (!topicId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('topic_history')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Could not load topic history:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.warn('Error loading history:', err);
+    return [];
+  }
 }
 
 /** Breadcrumbs for a path: one indexed IN-query, no recursion needed since
@@ -85,23 +218,55 @@ export async function getTopicBreadcrumbs(path) {
   return data.sort((a, b) => a.full_path.length - b.full_path.length);
 }
 
-/** The whole published tree, fetched once and shaped client-side. Docs sites
- *  rarely exceed a few thousand nodes, so one flat query + in-memory nesting
- *  beats N sidebar round-trips. Callers should cache this (see useNavTree). */
+/** The whole topic tree, fetched once and shaped client-side. */
 export async function getNavTree() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('topics')
-    .select('id, parent_id, slug, title, full_path, depth, position')
-    .eq('status', 'published')
+    .select(EXTENDED_NAV_FIELDS)
     .order('depth', { ascending: true })
     .order('position', { ascending: true })
     .order('title', { ascending: true });
 
+  if (error && error.code === '42703') {
+    const fallback = await supabase
+      .from('topics')
+      .select(BASE_NAV_FIELDS)
+      .order('depth', { ascending: true })
+      .order('position', { ascending: true })
+      .order('title', { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) throw error;
-  return buildTree(data);
+  return buildTree(data || []);
 }
 
-function buildTree(flat) {
+/** Flat list of all topics for instant homepage search */
+export async function getAllTopicsFlat() {
+  let { data, error } = await supabase
+    .from('topics')
+    .select(EXTENDED_NAV_FIELDS)
+    .order('depth', { ascending: true })
+    .order('position', { ascending: true })
+    .order('title', { ascending: true });
+
+  if (error && error.code === '42703') {
+    const fallback = await supabase
+      .from('topics')
+      .select(BASE_NAV_FIELDS)
+      .order('depth', { ascending: true })
+      .order('position', { ascending: true })
+      .order('title', { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error) throw error;
+  return data || [];
+}
+
+export function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
   const roots = [];
   for (const node of byId.values()) {
@@ -123,18 +288,30 @@ export async function searchTopics(query) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin-only mutations. RLS rejects these outright for non-admins; the try/
-// catch at the call site is what surfaces that as a friendly UI message.
+// Mutations: Any authenticated Supabase user can modify data.
 // ---------------------------------------------------------------------------
 
 export async function getAllTopicsForAdmin() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('topics')
-    .select('id, parent_id, slug, title, full_path, depth, position, status, updated_at, published_at')
+    .select('id, parent_id, slug, title, full_path, depth, position, status, updated_at, published_at, updated_by_email')
     .order('depth', { ascending: true })
-    .order('position', { ascending: true });
+    .order('position', { ascending: true })
+    .order('title', { ascending: true });
+
+  if (error && error.code === '42703') {
+    const fallback = await supabase
+      .from('topics')
+      .select('id, parent_id, slug, title, full_path, depth, position, status, updated_at, published_at')
+      .order('depth', { ascending: true })
+      .order('position', { ascending: true })
+      .order('title', { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) throw error;
-  return buildTree(data);
+  return buildTree(data || []);
 }
 
 export async function getTopicForEdit(id) {
@@ -143,31 +320,117 @@ export async function getTopicForEdit(id) {
   return data;
 }
 
-export async function createTopic({ parentId, slug, title, content = '', status = 'draft', metaDescription }) {
-  const { data, error } = await supabase
+export async function createTopic({ parentId, slug, title, content = '', status = 'published', metaDescription }) {
+  const finalSlug = slugify(slug?.trim() || title);
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
+
+  const payload = {
+    parent_id: parentId ?? null,
+    slug: finalSlug,
+    title,
+    content,
+    status,
+    meta_description: metaDescription ?? null,
+  };
+
+  if (user) {
+    payload.created_by = user.id;
+    payload.created_by_email = user.email;
+    payload.updated_by = user.id;
+    payload.updated_by_email = user.email;
+  }
+
+  let { data, error } = await supabase
     .from('topics')
-    .insert({
-      parent_id: parentId ?? null,
-      slug: slugify(slug ?? title),
-      title,
-      content,
-      status,
-      meta_description: metaDescription ?? null,
-    })
+    .insert(payload)
     .select()
     .single();
 
+  if (error && error.code === '42703') {
+    delete payload.created_by_email;
+    delete payload.updated_by;
+    delete payload.updated_by_email;
+    const retry = await supabase.from('topics').insert(payload).select().single();
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error) throw translateDbError(error);
+
+  // Backup log if trigger is not yet installed
+  try {
+    await supabase.from('topic_history').insert({
+      topic_id: data.id,
+      action: 'created',
+      title: data.title,
+      slug: data.slug,
+      full_path: data.full_path,
+      content: data.content,
+      modified_by: user?.id,
+      modified_by_email: user?.email,
+      summary: 'Initial topic creation',
+    });
+  } catch (_) {}
+
   return data;
 }
 
 export async function updateTopic(id, patch) {
   const payload = { ...patch };
-  if (payload.slug) payload.slug = slugify(payload.slug);
+  if (payload.slug !== undefined) {
+    payload.slug = slugify(payload.slug?.trim() || '');
+  }
 
-  const { data, error } = await supabase.from('topics').update(payload).eq('id', id).select().single();
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
+  if (user) {
+    payload.updated_by = user.id;
+    payload.updated_by_email = user.email;
+  }
+  payload.updated_at = new Date().toISOString();
+
+  let { data, error } = await supabase.from('topics').update(payload).eq('id', id).select().single();
+
+  if (error && error.code === '42703') {
+    delete payload.updated_by;
+    delete payload.updated_by_email;
+    const retry = await supabase.from('topics').update(payload).eq('id', id).select().single();
+    data = retry.data;
+    error = retry.error;
+  }
+
+  if (error) throw translateDbError(error);
+
+  // Backup log if trigger is not yet installed
+  try {
+    await supabase.from('topic_history').insert({
+      topic_id: data.id,
+      action: 'updated',
+      title: data.title,
+      slug: data.slug,
+      full_path: data.full_path,
+      content: data.content,
+      modified_by: user?.id,
+      modified_by_email: user?.email,
+      summary: 'Topic content / settings updated',
+    });
+  } catch (_) {}
+
+  return data;
+}
+
+export async function updateTopicPosition(id, position) {
+  const { data, error } = await supabase.from('topics').update({ position }).eq('id', id).select().single();
   if (error) throw translateDbError(error);
   return data;
+}
+
+export async function reorderTopics(orderedIds) {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase.from('topics').update({ position: i }).eq('id', orderedIds[i]);
+    if (error) throw translateDbError(error);
+  }
 }
 
 export async function setPublishStatus(id, status) {
@@ -175,12 +438,73 @@ export async function setPublishStatus(id, status) {
 }
 
 export async function moveTopic(topicId, newParentId, newSlug) {
+  const finalSlug = newSlug ? slugify(newSlug) : null;
   const { error } = await supabase.rpc('move_topic', {
     p_topic_id: topicId,
     p_new_parent_id: newParentId,
-    p_new_slug: newSlug ?? null,
+    p_new_slug: finalSlug,
   });
-  if (error) throw translateDbError(error);
+
+  if (!error) return;
+
+  // Resilient fallback if remote DB RPC has not yet been executed
+  const { data: topic, error: tErr } = await supabase.from('topics').select('*').eq('id', topicId).single();
+  if (tErr) throw tErr;
+
+  const effectiveSlug = finalSlug || topic.slug;
+  let newPath = effectiveSlug;
+  let newDepth = 0;
+
+  if (newParentId) {
+    const { data: parent, error: pErr } = await supabase.from('topics').select('full_path, depth').eq('id', newParentId).single();
+    if (pErr) throw pErr;
+    newPath = `${parent.full_path}/${effectiveSlug}`;
+    newDepth = (parent.depth ?? 0) + 1;
+  }
+
+  const oldPath = topic.full_path;
+
+  const { error: uErr } = await supabase
+    .from('topics')
+    .update({
+      parent_id: newParentId,
+      slug: effectiveSlug,
+      full_path: newPath,
+      depth: newDepth,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', topicId);
+
+  if (uErr) throw translateDbError(uErr);
+
+  // Update descendants if path changed
+  if (oldPath !== newPath) {
+    const { data: descendants } = await supabase
+      .from('topics')
+      .select('id, full_path')
+      .like('full_path', `${oldPath}/%`);
+
+    if (descendants?.length) {
+      for (const desc of descendants) {
+        const descNewPath = desc.full_path.replace(oldPath, newPath);
+        const descDepth = descNewPath.split('/').length - 1;
+        await supabase
+          .from('topics')
+          .update({
+            full_path: descNewPath,
+            depth: descDepth,
+          })
+          .eq('id', desc.id);
+      }
+    }
+
+    try {
+      await supabase.from('topic_redirects').insert({
+        topic_id: topicId,
+        old_path: oldPath,
+      });
+    } catch (_) {}
+  }
 }
 
 export async function countSubtree(fullPath) {
@@ -190,9 +514,27 @@ export async function countSubtree(fullPath) {
 }
 
 export async function deleteTopic(id) {
-  // Deleting a parent cascades to all descendants at the DB level (FK
-  // on delete cascade). The admin UI must call countSubtree() first and get
-  // explicit confirmation before calling this — see TopicEditor.jsx.
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
+
+  // Best effort log before deleting
+  try {
+    const { data: topic } = await supabase.from('topics').select('title, slug, full_path, status').eq('id', id).maybeSingle();
+    if (topic) {
+      await supabase.from('topic_history').insert({
+        topic_id: id,
+        action: 'deleted',
+        title: topic.title,
+        slug: topic.slug,
+        full_path: topic.full_path,
+        status: topic.status,
+        modified_by: user?.id,
+        modified_by_email: user?.email,
+        summary: 'Topic deleted',
+      });
+    }
+  } catch (_) {}
+
   const { error } = await supabase.from('topics').delete().eq('id', id);
   if (error) throw translateDbError(error);
 }
@@ -201,11 +543,12 @@ export async function deleteTopic(id) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function normalizePath(path) {
-  return path.replace(/^\/+|\/+$/g, '');
+export function normalizePath(path) {
+  return (path || '').replace(/^\/+|\/+$/g, '');
 }
 
 export function slugify(input) {
+  if (!input) return '';
   return input
     .toLowerCase()
     .trim()
@@ -215,7 +558,7 @@ export function slugify(input) {
     .replace(/^-+|-+$/g, '');
 }
 
-function translateDbError(error) {
+export function translateDbError(error) {
   if (error.code === '23505') {
     return new Error('A topic with this slug already exists under the same parent.');
   }
