@@ -4,7 +4,7 @@ import { Shield, ArrowLeft, Lock, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
-  const { signIn, isAdmin, loading } = useAuth();
+  const { signIn, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && isAdmin) {
+  if (!loading && isAuthenticated) {
     return <Navigate to={location.state?.from ?? '/admin'} replace />;
   }
 

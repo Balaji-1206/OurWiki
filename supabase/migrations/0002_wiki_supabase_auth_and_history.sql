@@ -2,8 +2,7 @@
 -- Migration: 0002_wiki_supabase_auth_and_history.sql
 -- Goal:
 --   1. Public read access: Anyone can read all pages without signing in.
---   2. Any Supabase authenticated user (created directly in Supabase Auth)
---      can create, edit, move, and delete any topic.
+--   2. Any authenticated Supabase user can create, edit, move, and delete topics.
 --   3. Audit trail: Track creator, last editor, and store full revision history
 --      in public.topic_history.
 -- ============================================================================

@@ -54,13 +54,13 @@ export function AuthProvider({ children }) {
 
   const user = session?.user ?? null;
   const isAuthenticated = !!user;
+  const isAdmin = isAuthenticated;
 
   const value = {
     session,
     user,
     profile,
     isAuthenticated,
-    // Any authenticated Supabase user can edit and access wiki studio
     canEdit: isAuthenticated,
     isAdmin: isAuthenticated,
     isOwner: profile?.role === 'owner',
