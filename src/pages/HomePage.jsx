@@ -126,17 +126,7 @@ export default function HomePage() {
     <div className="mx-auto max-w-5xl space-y-8">
       {/* Clean Hero Header (No architecture jargon) */}
       <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-800 dark:bg-gray-900/60">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-3 py-0.5 text-xs font-semibold text-accent dark:border-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400">
-            <Compass className="h-3.5 w-3.5" />
-            <span>OurWiki Knowledge Base</span>
-          </span>
-
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-paper/80 px-2.5 py-0.5 text-xs font-medium text-muted dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <Globe className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Open read access — no login needed</span>
-          </span>
-        </div>
+        
 
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink sm:text-3xl lg:text-4xl dark:text-white">
           Documentation &amp; Wiki
@@ -170,42 +160,7 @@ export default function HomePage() {
           </div>
 
           {/* Filter Pills */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-medium text-muted dark:text-gray-400">Filter:</span>
-            <button
-              type="button"
-              onClick={() => setActiveFilter('all')}
-              className={`rounded-lg px-2.5 py-1 font-medium transition ${
-                activeFilter === 'all'
-                  ? 'bg-accent text-white dark:bg-emerald-600'
-                  : 'border border-border/80 bg-white text-muted hover:text-ink dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
-              }`}
-            >
-              All Pages ({totalTopicsCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveFilter('parents')}
-              className={`rounded-lg px-2.5 py-1 font-medium transition ${
-                activeFilter === 'parents'
-                  ? 'bg-accent text-white dark:bg-emerald-600'
-                  : 'border border-border/80 bg-white text-muted hover:text-ink dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
-              }`}
-            >
-              Parent Topics ({parentTopicsCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveFilter('children')}
-              className={`rounded-lg px-2.5 py-1 font-medium transition ${
-                activeFilter === 'children'
-                  ? 'bg-accent text-white dark:bg-emerald-600'
-                  : 'border border-border/80 bg-white text-muted hover:text-ink dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
-              }`}
-            >
-              Child Subpages ({childTopicsCount})
-            </button>
-          </div>
+          
         </div>
       </div>
 
@@ -261,7 +216,7 @@ export default function HomePage() {
                         ) : (
                           <>
                             <FileText className="h-3 w-3" />
-                            <span>Child Page</span>
+                            <span>Sub Topics</span>
                           </>
                         )}
                       </span>
@@ -400,7 +355,7 @@ export default function HomePage() {
                       {childCount > 0 ? (
                         <div className="mt-3 space-y-1 rounded-lg border border-border/60 bg-paper/50 p-2.5 dark:border-gray-800 dark:bg-gray-800/40">
                           <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted dark:text-gray-400">
-                            Child Pages:
+                            sub topics:
                           </p>
                           <ul className="space-y-1 text-xs">
                             {directChildren.map((child) => (
@@ -418,7 +373,7 @@ export default function HomePage() {
                         </div>
                       ) : (
                         <p className="mt-3 text-xs italic text-muted/60 dark:text-gray-500">
-                          No child pages under this topic yet.
+                          No sub topics under this topic yet.
                         </p>
                       )}
                     </div>

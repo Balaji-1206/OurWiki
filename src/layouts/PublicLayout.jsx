@@ -93,7 +93,7 @@ export default function PublicLayout() {
                 title="Sign in to create and edit documentation (readers do not need to sign in)"
               >
                 <LogIn className="h-3.5 w-3.5 text-accent dark:text-emerald-400" />
-                <span>Sign in to Edit</span>
+                <span>Login</span>
               </Link>
             )}
           </div>

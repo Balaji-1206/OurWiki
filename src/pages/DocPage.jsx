@@ -220,7 +220,7 @@ export default function DocPage() {
                 title="Sign in to edit this page"
               >
                 <Edit className="h-3.5 w-3.5" />
-                <span>Sign in to edit</span>
+                <span>Login</span>
               </Link>
             )}
           </div>

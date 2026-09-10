@@ -44,10 +44,8 @@ export default function LoginPage() {
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent dark:bg-emerald-950/60 dark:text-emerald-400">
             <Shield className="h-5 w-5" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Editor Sign In</h1>
-          <p className="mt-1 text-xs text-muted dark:text-gray-400">
-            Sign in with your Supabase account to edit pages and publish documentation.
-          </p>
+          <h1 className="text-xl font-bold tracking-tight">Admin Login</h1>
+          
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -92,12 +90,12 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-light disabled:opacity-60 dark:bg-emerald-600 dark:hover:bg-emerald-500"
           >
-            {submitting ? 'Signing in...' : 'Sign in to Edit'}
+            {submitting ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
         <div className="mt-6 rounded-lg border border-border/80 bg-paper/60 p-3 text-center text-[11px] text-muted dark:border-gray-800 dark:bg-gray-800/40 dark:text-gray-400">
-          <span>Accounts can be added directly in your Supabase project under <strong>Authentication &gt; Users</strong>.</span>
+          <span>To be a Contributer contact <strong> mohamedmeerasham.cse2024@citchennai.net</strong>.</span>
         </div>
       </div>
     </div>
