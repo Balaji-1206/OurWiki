@@ -14,6 +14,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { slugify } from '../services/topics';
+import ArticleImage from './ArticleImage';
 
 // Extend the default sanitize schema to keep syntax-highlight classes and heading IDs
 const schema = {
@@ -237,7 +238,7 @@ export default function MarkdownRenderer({ content }) {
             />
           ),
           img: ({ node, ...props }) => (
-            <img {...props} loading="lazy" className="rounded-xl border border-border shadow-sm dark:border-gray-800" />
+            <ArticleImage key={props.src} {...props} />
           ),
         }}
       >

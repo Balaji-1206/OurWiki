@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Bold,
@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ExternalLink,
+  ImagePlus,
 } from 'lucide-react';
 import {
   getTopicForEdit,
@@ -25,6 +26,8 @@ import {
 } from '../../services/topics';
 import MarkdownRenderer from '../../components/MarkdownRenderer';
 import LoadingState from '../../components/LoadingState';
+import ImageUploadDialog from '../../components/ImageUploadDialog';
+import { insertImageMarkdown } from '../../services/images';
 
 function flattenForSelect(tree, depth = 0, out = []) {
   for (const n of tree) {
@@ -39,6 +42,12 @@ export default function TopicEditor() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isNew = !id;
+  const textareaRef = useRef(null);
+  const imageSelection = useRef({ start: 0, end: 0 });
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
+  // Changing topics unmounts the dialog and aborts any in-flight upload.
+  useEffect(() => { setImageDialogOpen(false); }, [id]);
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -94,6 +103,7 @@ export default function TopicEditor() {
       (form.parentId || null) !== (initialStructure.parentId || null));
 
   const insertMarkdown = (prefix, suffix = '', defaultText = '') => {
+    if (imageDialogOpen) return;
     const textarea = document.getElementById('markdown-editor-textarea');
     if (!textarea) return;
 
@@ -112,8 +122,32 @@ export default function TopicEditor() {
     }, 10);
   };
 
+  const openImageDialog = () => {
+    const textarea = textareaRef.current;
+    if (!textarea || saving) return;
+    imageSelection.current = { start: textarea.selectionStart, end: textarea.selectionEnd };
+    setImageDialogOpen(true);
+  };
+
+  const closeImageDialog = () => {
+    setImageDialogOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const insertImage = (markdown) => {
+    const { start, end } = imageSelection.current;
+    const inserted = insertImageMarkdown(form.content, start, end, markdown);
+    update({ content: inserted.content });
+    setImageDialogOpen(false);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(inserted.cursor, inserted.cursor);
+    });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+    if (imageDialogOpen || saving) return;
     setSaving(true);
     setError(null);
     setSuccessMessage(null);
@@ -208,6 +242,7 @@ export default function TopicEditor() {
             <button
               type="button"
               onClick={handleTogglePublish}
+              disabled={imageDialogOpen || saving}
               className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-sm transition ${
                 form.status === 'published'
                   ? 'bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:hover:bg-amber-900'
@@ -313,6 +348,12 @@ export default function TopicEditor() {
           {/* Formatting Toolbar */}
           <div className="flex flex-wrap items-center justify-between border-b border-border bg-paper/60 px-4 py-2 dark:border-gray-800 dark:bg-gray-800/40">
             <div className="flex items-center gap-1">
+              <button type="button" onClick={openImageDialog} disabled={saving || imageDialogOpen}
+                title="Add image" aria-label="Add image"
+                className="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-muted transition hover:bg-black/5 hover:text-ink disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
+                <ImagePlus className="h-4 w-4" />
+                <span>Add image</span>
+              </button>
               <button
                 type="button"
                 onClick={() => insertMarkdown('**', '**', 'bold text')}
@@ -384,6 +425,8 @@ export default function TopicEditor() {
           <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 dark:divide-gray-800">
             <textarea
               id="markdown-editor-textarea"
+              ref={textareaRef}
+              readOnly={imageDialogOpen}
               value={form.content}
               onChange={(e) => update({ content: e.target.value })}
               rows={22}
@@ -403,7 +446,7 @@ export default function TopicEditor() {
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || imageDialogOpen}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-light disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
           >
             <Save className="h-4 w-4" />
@@ -419,6 +462,7 @@ export default function TopicEditor() {
           </button>
         </div>
       </form>
+      {imageDialogOpen && <ImageUploadDialog key={id || 'new'} onInsert={insertImage} onClose={closeImageDialog} />}
     </div>
   );
 }
