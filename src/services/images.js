@@ -2,10 +2,28 @@ import { supabase } from '../lib/supabaseClient';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const TYPE_ALIASES = { 'image/jpg': 'image/jpeg', 'image/pjpeg': 'image/jpeg', 'image/x-png': 'image/png' };
+
+function normalizeImageType(file) {
+  const type = String(file.type || '').toLowerCase();
+  if (TYPE_ALIASES[type]) return TYPE_ALIASES[type];
+  if (ALLOWED_TYPES.has(type)) return type;
+
+  const match = String(file.name || '').match(/\.(png|jpe?g|webp)$/i);
+  if (!match) return '';
+
+  const extension = match[1].toLowerCase();
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  return '';
+}
 
 export function validateImage(file) {
   if (!file) throw new Error('Choose an image first.');
-  if (!ALLOWED_TYPES.has(file.type)) throw new Error('Choose a PNG, JPEG or WebP image.');
+  if (!ALLOWED_TYPES.has(normalizeImageType(file))) {
+    throw new Error('Choose a PNG, JPEG or WebP image.');
+  }
   if (!file.size || file.size > MAX_IMAGE_BYTES) throw new Error('Choose an image smaller than or equal to 5 MB.');
 }
 

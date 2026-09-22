@@ -28,6 +28,8 @@ describe('image validation and insertion', () => {
     expect(() => validateImage({ type: 'image/png', size: 0 })).toThrow('5 MB');
     expect(() => validateImage({ type: 'image/png', size: MAX_IMAGE_BYTES + 1 })).toThrow('5 MB');
     expect(() => validateImage(file())).not.toThrow();
+    expect(() => validateImage(new File(['image'], 'diagram.jpg', { type: 'image/jpg' }))).not.toThrow();
+    expect(() => validateImage(new File(['image'], 'diagram.jpeg', { type: '' }))).not.toThrow();
   });
   it('escapes descriptions and captions without introducing Markdown links', () => {
     const markdown = createImageMarkdown(result.secure_url, '[node] <script>', '*caption*');
