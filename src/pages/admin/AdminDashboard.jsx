@@ -46,6 +46,10 @@ function flattenTree(nodes, list = []) {
   return list;
 }
 
+export function shouldNodeBeExpanded(nodeId, expandedIds = new Set(), searchTerm = '') {
+  return expandedIds.has(nodeId) || !!searchTerm.trim();
+}
+
 /** 1-Click Interactive Status Badge */
 function StatusBadge({ status, onClick, disabled }) {
   const isPublished = status === 'published';
@@ -74,6 +78,8 @@ function TreeRow({
   siblings,
   index,
   isExpanded,
+  expandedIds,
+  searchTerm,
   onToggleExpand,
   onMove,
   onToggleStatus,
@@ -249,7 +255,9 @@ function TreeRow({
             depth={depth + 1}
             siblings={node.children}
             index={cIdx}
-            isExpanded={true}
+            isExpanded={shouldNodeBeExpanded(child.id, expandedIds, searchTerm)}
+            expandedIds={expandedIds}
+            searchTerm={searchTerm}
             onToggleExpand={onToggleExpand}
             onMove={onMove}
             onToggleStatus={onToggleStatus}
@@ -790,7 +798,9 @@ export default function AdminDashboard() {
                 depth={0}
                 siblings={filteredTree}
                 index={idx}
-                isExpanded={expandedIds.has(node.id) || !!search.trim()}
+                isExpanded={shouldNodeBeExpanded(node.id, expandedIds, search)}
+                expandedIds={expandedIds}
+                searchTerm={search}
                 onToggleExpand={handleToggleExpand}
                 onMove={handleMoveSibling}
                 onToggleStatus={handleToggleStatus}
